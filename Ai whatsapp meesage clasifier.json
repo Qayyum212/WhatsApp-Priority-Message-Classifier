@@ -1,0 +1,353 @@
+{
+  "name": "AI WhatsApp Message Priority Classifier - Template",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI assistant for WhatsApp message priority triage.\n\nYour job is to:\n1. Extract sender_name, sender_phone, and message from the raw text.\n2. Determine the message priority.\n3. Return the reason for the classification.\n4. Recommend the action to take.\n\nRaw message text:\n{{ $json.rawMessage }}\n\nInput format used in this prototype:\n- First word = sender_name\n- Number = sender_phone\n- Remaining text = message\n\nPriority definitions:\n- high = urgent or requires immediate attention\n- low = casual or not urgent\n\nClassification rules:\n- If the message contains words such as \"urgent\", \"call me\", \"now\", \"asap\", \"hospital\", \"emergency\", or \"critical\", classify as high.\n- Casual messages should be classified as low.\n- Do not classify everything as high.\n\nAction rules:\n- If priority is high, action = send_now\n- If priority is low, action = queue_digest\n\nReturn ONLY valid JSON in this format:\n\n{\n  \"sender_name\": \"\",\n  \"sender_phone\": \"\",\n  \"message\": \"\",\n  \"priority\": \"\",\n  \"reason\": \"\",\n  \"action\": \"\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -272,
+        144
+      ],
+      "id": "464c6472-9cc6-4b38-b486-de6442d8d89c",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "id"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        368
+      ],
+      "id": "806a3dcb-7733-4180-9b51-efd0cf8776e4",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_YOUR_OPENAIAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"sender_name\": {\n      \"type\": \"string\"\n    },\n    \"sender_phone\": {\n      \"type\": \"string\"\n    },\n    \"message\": {\n      \"type\": \"string\"\n    },\n    \"priority\": {\n      \"type\": \"string\",\n      \"enum\": [\"high\", \"medium\", \"low\"]\n    },\n    \"reason\": {\n      \"type\": \"string\"\n    },\n    \"action\": {\n      \"type\": \"string\",\n      \"enum\": [\"send_now\", \"queue_digest\"]\n    }\n  },\n  \"required\": [\n    \"sender_name\",\n    \"sender_phone\",\n    \"message\",\n    \"priority\",\n    \"reason\",\n    \"action\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -144,
+        368
+      ],
+      "id": "b69c18b5-23e1-463b-923d-f420282ae9b6",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        -192
+      ],
+      "id": "58477447-103a-49ff-adc4-dbf342e37f1c",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@example.com",
+        "subject": "High Priority WhatsApp Message Alert",
+        "emailType": "text",
+        "message": "={{ \n\"🚨 HIGH PRIORITY MESSAGES\\n\\n\" + \n$json.messages.map((item, i) =>\n\"🔴 Message \" + (i+1) + \"\\n\" +\n\"Name   : \" + item.output.sender_name + \"\\n\" +\n\"Phone  : \" + item.output.sender_phone + \"\\n\" +\n\"Message: \" + item.output.message + \"\\n\" +\n\"Reason : \" + item.output.reason\n).join('\\n\\n----------------------\\n\\n')\n}}\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        48
+      ],
+      "id": "e025b087-ee92-49fa-95c0-b0d1a9c5d2d4",
+      "name": "High priority ",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_YOUR_GMAILOAUTH2_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8ee57ff8-f788-408a-8b6c-a071b4cb78b2",
+              "leftValue": "={{$json.output.priority.trim().toLowerCase()}}",
+              "rightValue": "high",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        80,
+        144
+      ],
+      "id": "07341fed-3209-4007-a9db-e542fd853efb",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@example.com",
+        "subject": "Low Priority WhatsApp Message Digest",
+        "emailType": "text",
+        "message": "={{ \n\" Low PRIORITY MESSAGES\\n\\n\" + \n$json.messages.map((item, i) =>\n\"🔴 Message \" + (i+1) + \"\\n\" +\n\"Name   : \" + item.output.sender_name + \"\\n\" +\n\"Phone  : \" + item.output.sender_phone + \"\\n\" +\n\"Message: \" + item.output.message + \"\\n\" +\n\"Reason : \" + item.output.reason\n).join('\\n\\n----------------------\\n\\n')\n}}\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        240
+      ],
+      "id": "a54dd1a3-bb50-40ef-941e-03c42bcdb49a",
+      "name": "Low priority",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_YOUR_GMAILOAUTH2_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        240
+      ],
+      "id": "dfbf1424-ab6f-4344-ba83-f7bb54e8f3ee",
+      "name": "Wait",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "messages",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        304,
+        48
+      ],
+      "id": "0407d5f1-f16d-43ef-a0fe-4c979f4c4bde",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "messages",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        304,
+        240
+      ],
+      "id": "383e5774-854e-4d26-ae6b-f6e13375eb2b",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        144
+      ],
+      "id": "2e59c598-9379-4f1f-960d-da89f1349adb",
+      "name": "WhatsApp Trigger",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_YOUR_WHATSAPPTRIGGERAPI_CREDENTIAL"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {
+        "json": {
+          "rawMessage": "TestUser 60123456789 hi this is urgent please call me back"
+        }
+      },
+      {
+        "json": {
+          "rawMessage": "TestUser 60123456789 good morning, just checking in"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Low priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "High priority ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "note": "Sensitive instance metadata removed for public template."
+  },
+  "tags": [
+    {
+      "name": "Beginner_test workflow",
+      "description": "Prototype / Proof of Concept"
+    }
+  ]
+}
